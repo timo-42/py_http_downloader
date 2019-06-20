@@ -21,7 +21,13 @@ class DownloadTask:
         
     def download(self):
         try:
-            with urllib.request.urlopen(self.url) as req:
+            # make url %encoding
+            url = urllib.parse.urlsplit(self.url)
+            url = list(url)
+            url[2] = urllib.parse.quote(url[2])
+            url = urllib.parse.urlunsplit(url)
+            
+            with urllib.request.urlopen(url) as req:
                 data = req.read()
     
             # open file, if it exists current bytes will be deleted
@@ -59,22 +65,20 @@ class Fetch:
     def prepare(self):
         for url in self.urls:
             
-            # parsing url
-            parsed_url = urllib.parse.urlsplit(url)
-            
-            (sanity_check, file_path) = url_sanity_check(url, parsed_url, self.download_directory)
+            # do a sanity check for the url
+            (sanity_check, file_path) = url_sanity_check(url, self.download_directory)
             if sanity_check == False:
                 # url cannot pass sanity check
                 # skip it
                 continue
             
-            # create task for download
-            logging.info("creating Task for url: {}".format(url))
-            
             # now we know the path is secure, we can create the subdirectories
             # for storing the files, we do it here because it is singlethreaded
             # and we dont have to handle race conditions
             file_path.parent.mkdir(parents=True,exist_ok=True)
+            
+            # create task for download
+            logging.info("creating Task for url: {}".format(url))
             
             # we write the temporary file to tmp_dir/hash, because we dont want
             # to replicate a full directory hierachy in it
@@ -90,11 +94,13 @@ class Fetch:
             self.tasks.append(DownloadTask(url, file_path, tmp_path))
             
     def run(self):
-        for task in self.tasks:
-            task.download()
-        pass
+        for i in map(DownloadTask.download, self.tasks):
+            pass
 
-def url_sanity_check(url, parsed_url, download_directory):
+def url_sanity_check(url, download_directory):
+    
+    parsed_url = urllib.parse.urlsplit(url)
+    
     # skip urls which are not http(s) or ftp
     if not (parsed_url.scheme == "http" or parsed_url.scheme == "https"):
         logging.warning("Url with unsupported Scheme: {}".format(url))
