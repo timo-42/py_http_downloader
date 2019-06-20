@@ -12,6 +12,7 @@ import urllib.parse
 import logging
 import hashlib
 import binascii
+from multiprocessing.dummy import Pool as ThreadPool
 
 class DownloadTask:
     def __init__(self, url, file_path, tmp_path):
@@ -21,6 +22,10 @@ class DownloadTask:
         
     def download(self):
         try:
+            if self.file_path.is_dir():
+                logging.warning("Try writing a File to a directory. Url: {}".format(self.url))
+                return
+
             # make url %encoding
             url = urllib.parse.urlsplit(self.url)
             url = list(url)
@@ -35,9 +40,6 @@ class DownloadTask:
                 f.write(data)
                 f.flush()
                 f.close()
-            if self.file_path.is_dir():
-                logging.warning("Try writing a File to a directory. Url: {}".format(self.url))
-                return
             
             # rename is an atomic operation on posix filesystems, so we have a
             # consistent download directory without broken downloaded files
@@ -48,7 +50,7 @@ class DownloadTask:
 class Fetch:
     tasks = []
     
-    def __init__(self, urls, download_directory, tmp_directory=None, threads=4):
+    def __init__(self, urls, download_directory, tmp_directory, threads=4):
         self.urls = urls
         
         if not type(threads) is int:
@@ -94,8 +96,13 @@ class Fetch:
             self.tasks.append(DownloadTask(url, file_path, tmp_path))
             
     def run(self):
-        for i in map(DownloadTask.download, self.tasks):
-            pass
+        #for i in map(DownloadTask.download, self.tasks):
+        #    pass
+        
+        pool = ThreadPool(self.threads)
+        pool.map(DownloadTask.download, self.tasks)
+        pool.close()
+        pool.join()
 
 def url_sanity_check(url, download_directory):
     
