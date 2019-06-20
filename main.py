@@ -107,7 +107,7 @@ class Fetch:
 def url_sanity_check(url, download_directory):
     
     parsed_url = urllib.parse.urlsplit(url)
-    
+
     # skip urls which are not http(s) or ftp
     if not (parsed_url.scheme == "http" or parsed_url.scheme == "https"):
         logging.warning("Url with unsupported Scheme: {}".format(url))
@@ -142,7 +142,7 @@ def url_sanity_check(url, download_directory):
     # otherwise we would try to write outside of given directory
     # which could be a bug or an attack
     try:
-        file_path.relative_to(download_directory).resolve()
+        file_path.relative_to(download_directory / parsed_url.netloc).resolve()
     except ValueError:
         logging.warning("Wrong base download directory. Download Directory: {} FilePath: {} Url: {}".format(download_directory, file_path, url))
         return (False,None)
