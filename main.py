@@ -16,6 +16,12 @@ import sys
 from multiprocessing.dummy import Pool as ThreadPool
 
 class DownloadTask:
+    """
+    Downloads the file and can rename it atomic
+    should the file already exist, it will not be downloaded again,
+    should the file exist in the tmp directory, the file will be deleted and
+    downloaded again
+    """
     def __init__(self, url, file_path, tmp_path):
         self.url       = url
         self.file_path = file_path
@@ -26,7 +32,11 @@ class DownloadTask:
             if self.file_path.is_dir():
                 logging.warning("Try writing a File to a directory. Url: {}".format(self.url))
                 return
-
+            
+            if self.file_path.exists():
+                logging.info("File already exists. Skipping url {}".format(self.url))
+                return
+            
             # make url %encoding
             url = urllib.parse.urlsplit(self.url)
             url = list(url)
@@ -49,6 +59,11 @@ class DownloadTask:
             logging.warning("Couldnt download url or store the File on disk. Url: {}".format(self.url))
 
 class Fetch:
+    """
+    Gets all the Urls, tests them for malicious paths and creates the tasks.
+    With the run method the downloads can be started.
+    """
+    
     tasks = []
     
     def __init__(self, urls, download_directory, tmp_directory, threads=4):
@@ -64,6 +79,8 @@ class Fetch:
             self.tmp_directory = Path(download_directory+"/tmp")
         else:
             self.tmp_directory = Path(tmp_directory)
+            
+        self.prepare()
         
     def prepare(self):
         for url in self.urls:
@@ -97,9 +114,7 @@ class Fetch:
             self.tasks.append(DownloadTask(url, file_path, tmp_path))
             
     def run(self):
-        #for i in map(DownloadTask.download, self.tasks):
-        #    pass
-        
+        # run the downloads in parallel        
         pool = ThreadPool(self.threads)
         pool.map(DownloadTask.download, self.tasks)
         pool.close()
@@ -160,5 +175,4 @@ if __name__ == "__main__":
             line = line.strip()
             urls.add(line)
     fetch = Fetch(urls, ".", ".")
-    fetch.prepare()
     fetch.run()
