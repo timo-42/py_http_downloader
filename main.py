@@ -62,42 +62,10 @@ class Fetch:
             # parsing url
             parsed_url = urllib.parse.urlsplit(url)
             
-            # skip urls which are not http(s) or ftp
-            if not (parsed_url.scheme == "http" or parsed_url.scheme == "https"):
-                logging.warning("Url with unsupported Scheme: {}".format(url))
-                continue
-            
-            url_file_path = Path(parsed_url.path)
-            
-            # check urls which end with /
-            if url.endswith("/"):
-                logging.warning("Url ends with a trailing /. Will not download. Url: {}".format(url))
-                continue
-            
-            # check for urls without path like http://domain.org or http://domain.org/
-            if len(url_file_path.parts) == 0 or len(url_file_path.parts) == 1:
-                logging.warning("Url with unsupported Path: {}".format(url))
-                continue
-
-            # adding path from url and domain to our download directory
-            try:
-                file_path = self.download_directory / parsed_url.netloc / url_file_path.relative_to("/")
-                file_path = file_path.resolve()
-            except ValueError:
-                logging.warning("couldn't resolve download Filesystem Path. Url: {}".format(url))
-            
-            # sanity check for .. shenanigans
-            if ".." in file_path.parts:
-                logging.warning("there is .. in the file path, which is not supported. file path: {} Url: {}".format(file_path, url))
-                continue
-            
-            # check if the filepath begins with the given download directory,
-            # otherwise we would try to write outside of given directory
-            # which could be a bug or an attack
-            try:
-                file_path.relative_to(self.download_directory).resolve()
-            except ValueError:
-                logging.warning("Wrong base download directory. Download Directory: {} FilePath: {} Url: {}".format(self.download_directory, file_path, url))
+            (sanity_check, file_path) = url_sanity_check(url, parsed_url, self.download_directory)
+            if sanity_check == False:
+                # url cannot pass sanity check
+                # skip it
                 continue
             
             # create task for download
@@ -125,6 +93,49 @@ class Fetch:
         for task in self.tasks:
             task.download()
         pass
+
+def url_sanity_check(url, parsed_url, download_directory):
+    # skip urls which are not http(s) or ftp
+    if not (parsed_url.scheme == "http" or parsed_url.scheme == "https"):
+        logging.warning("Url with unsupported Scheme: {}".format(url))
+        return (False, None)
+    
+    url_file_path = Path(parsed_url.path)
+    
+    # check urls which end with /
+    if url.endswith("/"):
+        logging.warning("Url ends with a trailing /. Will not download. Url: {}".format(url))
+        return (False,None)
+    
+    # check for urls without path like http://domain.org or http://domain.org/
+    if len(url_file_path.parts) == 0 or len(url_file_path.parts) == 1:
+        logging.warning("Url with unsupported Path: {}".format(url))
+        return (False,None)
+
+    # adding path from url and domain to our download directory
+    try:
+        file_path = download_directory / parsed_url.netloc / url_file_path.relative_to("/")
+        file_path = file_path.resolve()
+    except ValueError:
+        logging.warning("couldn't resolve download Filesystem Path. Url: {}".format(url))
+        return (False,None)
+    
+    # sanity check for .. shenanigans
+    if ".." in file_path.parts:
+        logging.warning("there is .. in the file path, which is not supported. file path: {} Url: {}".format(file_path, url))
+        return (False,None)
+    
+    # check if the filepath begins with the given download directory,
+    # otherwise we would try to write outside of given directory
+    # which could be a bug or an attack
+    try:
+        file_path.relative_to(download_directory).resolve()
+    except ValueError:
+        logging.warning("Wrong base download directory. Download Directory: {} FilePath: {} Url: {}".format(download_directory, file_path, url))
+        return (False,None)
+    
+    # all checks are passed
+    return (True,file_path)
 
 if __name__ == "__main__":
     p = Path("tests/urls.txt")
