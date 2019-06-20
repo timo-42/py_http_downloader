@@ -12,6 +12,7 @@ import urllib.parse
 import logging
 import hashlib
 import binascii
+import sys
 from multiprocessing.dummy import Pool as ThreadPool
 
 class DownloadTask:
@@ -57,7 +58,7 @@ class Fetch:
             raise Exception("The concurrent paramenter must be an INT")
         self.threads = threads
         
-        self.download_directory = Path(download_directory)
+        self.download_directory = Path(download_directory).resolve()
 
         if tmp_directory == None:
             self.tmp_directory = Path(download_directory+"/tmp")
@@ -151,13 +152,13 @@ def url_sanity_check(url, download_directory):
     return (True,file_path)
 
 if __name__ == "__main__":
-    p = Path("tests/urls.txt")
+    p = Path(sys.argv[1])
     urls = set()
     with p.open() as f:
         for line in f:
             # remove whitespace and newlines
             line = line.strip()
             urls.add(line)
-    fetch = Fetch(urls, "/tmp/dl", "/tmp/tmp")
+    fetch = Fetch(urls, ".", ".")
     fetch.prepare()
     fetch.run()
