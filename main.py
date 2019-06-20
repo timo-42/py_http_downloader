@@ -12,7 +12,6 @@ import urllib.parse
 import logging
 import hashlib
 import binascii
-import concurrent.futures
 
 class DownloadTask:
     def __init__(self, url, file_path, tmp_path):
@@ -21,13 +20,21 @@ class DownloadTask:
         self.tmp_path  = tmp_path
         
     def download(self):
-        with urllib.request.urlopen(urllib.parse.quote(self.url)) as req:
+   
+        with urllib.request.urlopen(self.url) as req:
             data = req.read()
 
-        with self.tmp_path.open("xb") as f:
+        # open file, if it exists current bytes will be deleted
+        with self.tmp_path.open("wb") as f:
             f.write(data)
             f.flush()
             f.close()
+        if self.file_path.is_dir():
+            logging.warning("Try writing a File to a directory. Url: {}".format(self.url))
+            return
+        
+        # rename is an atomic operation on posix filesystems, so we have a
+        # consistent download directory without broken downloaded files
         self.tmp_path.rename(self.file_path)
 
 class Fetch:
@@ -60,14 +67,19 @@ class Fetch:
             
             url_file_path = Path(parsed_url.path)
             
+            # check urls which end with /
+            if url.endswith("/"):
+                logging.warning("Url ends with a trailing /. Will not download. Url: {}".format(url))
+                continue
+            
             # check for urls without path like http://domain.org or http://domain.org/
             if len(url_file_path.parts) == 0 or len(url_file_path.parts) == 1:
                 logging.warning("Url with unsupported Path: {}".format(url))
                 continue
 
-            # adding path from url to our download directory
+            # adding path from url and domain to our download directory
             try:
-                file_path = self.download_directory / url_file_path.relative_to("/")
+                file_path = self.download_directory / parsed_url.netloc / url_file_path.relative_to("/")
                 file_path = file_path.resolve()
             except ValueError:
                 logging.warning("couldn't resolve download Filesystem Path. Url: {}".format(url))
@@ -85,9 +97,14 @@ class Fetch:
             except ValueError:
                 logging.warning("Wrong base download directory. Download Directory: {} FilePath: {} Url: {}".format(self.download_directory, file_path, url))
                 continue
-            print(file_path)
+            
             # create task for download
             logging.info("creating Task for url: {}".format(url))
+            
+            # now we know the path is secure, we can create the subdirectories
+            # for storing the files, we do it here because it is singlethreaded
+            # and we dont have to handle race conditions
+            file_path.parent.mkdir(parents=True,exist_ok=True)
             
             # we write the temporary file to tmp_dir/hash, because we dont want
             # to replicate a full directory hierachy in it
@@ -96,14 +113,13 @@ class Fetch:
             h.update(url.encode("utf-8"))
             tmp_path = binascii.hexlify(h.digest()).decode("ascii")
             
-            # prepand the tmp_direcory
+            # prepend the tmp_direcory
             tmp_path = self.tmp_directory / Path(tmp_path )
             
             # add the task to the tasks queue
             self.tasks.append(DownloadTask(url, file_path, tmp_path))
             
     def run(self):
-        print(self.tasks)
         for task in self.tasks:
             task.download()
         pass
