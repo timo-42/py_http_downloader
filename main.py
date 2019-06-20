@@ -3,7 +3,7 @@
 """
 Created on Wed Jun 19 19:06:30 2019
 
-@author: kenobi
+@author: Timo Haas
 """
 
 from pathlib import Path
@@ -20,22 +20,24 @@ class DownloadTask:
         self.tmp_path  = tmp_path
         
     def download(self):
-   
-        with urllib.request.urlopen(self.url) as req:
-            data = req.read()
-
-        # open file, if it exists current bytes will be deleted
-        with self.tmp_path.open("wb") as f:
-            f.write(data)
-            f.flush()
-            f.close()
-        if self.file_path.is_dir():
-            logging.warning("Try writing a File to a directory. Url: {}".format(self.url))
-            return
-        
-        # rename is an atomic operation on posix filesystems, so we have a
-        # consistent download directory without broken downloaded files
-        self.tmp_path.rename(self.file_path)
+        try:
+            with urllib.request.urlopen(self.url) as req:
+                data = req.read()
+    
+            # open file, if it exists current bytes will be deleted
+            with self.tmp_path.open("wb") as f:
+                f.write(data)
+                f.flush()
+                f.close()
+            if self.file_path.is_dir():
+                logging.warning("Try writing a File to a directory. Url: {}".format(self.url))
+                return
+            
+            # rename is an atomic operation on posix filesystems, so we have a
+            # consistent download directory without broken downloaded files
+            self.tmp_path.rename(self.file_path)
+        except:
+            logging.warning("Couldnt download url or store the File on disk. Url: {}".format(self.url))
 
 class Fetch:
     tasks = []
