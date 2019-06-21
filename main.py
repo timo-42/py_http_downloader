@@ -76,6 +76,13 @@ class Fetch:
     tasks = []
     
     def __init__(self, urls, download_directory, tmp_directory, threads=4):
+        """
+        urls:               a collection of urls
+        download_directory: the directory where the downloaded files end up
+        tmp_directory:      a directory on the same filesystem partition as
+                            the download_directory, must exist
+        threads:            number of parallel downloads
+        """
         self.urls = urls
         
         if not type(threads) is int:
