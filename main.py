@@ -4,6 +4,13 @@
 Created on Wed Jun 19 19:06:30 2019
 
 @author: Timo Haas
+
+
+This programm will download a List of Files from a Webserver. It will download
+them into a temporary Folder and if successfull atomic rename them to the
+given download Directory. The temporay directory must be on the same Partition
+as the download directory for rename to work atomicly.
+
 """
 
 from pathlib import Path
@@ -169,6 +176,10 @@ def url_sanity_check(url, download_directory):
     return (True,file_path)
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: {} <file_with_download_urls>".format(sys.argv[0]))
+        exit(0)
+    
     p = Path(sys.argv[1])
     urls = set()
     with p.open() as f:
