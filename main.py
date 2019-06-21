@@ -62,6 +62,8 @@ class Fetch:
     """
     Gets all the Urls, tests them for malicious paths and creates the tasks.
     With the run method the downloads can be started.
+    download_directory and tmp_directory must be the same Filesystem, so
+    rename() is atomic
     """
     
     tasks = []
